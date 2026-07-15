@@ -2,12 +2,13 @@
 
 A **hidden, parallel economy** inside your browser — not crypto, not trading cards — **personal micro-empires** built from everyday constraints.
 
-You name a real limit (“limited garage space”, “newborn sleep windows”, “supplement shipping delays”). ShadowMarket generates a fictional system that **thrives because of that constraint**, complete with:
+You name a real limit (“limited garage space”, “newborn sleep windows”, “supplement shipping delays”). ShadowMarket generates a fictional system that **thrives because of that constraint**, shown as a **live industrial empire map** (nodes, glowing lanes, minimap, resource bars) — not a wall of text.
 
-- **Playable simulation** — accelerated time, resources, heat, market events  
-- **Exportable blueprints** — product ideas, process hacks, marketing angles (Markdown / JSON / print)  
-- **Rival empires** — anonymous competing systems you can **ally**, **sabotage**, or **merge**  
-- **Empire Seals** — share codes so another device can import your empire as a rival  
+- **Visual empire floor** — HQ, blueprint outposts, rival sites on a connected map  
+- **Playable simulation** — accelerated time, packets on paths, SPACE / TIME / HAULS meters  
+- **Click any node** — inspect HQ, blueprints, or rival actions (ally / sabotage / merge)  
+- **Exportable blueprints** — Markdown / JSON / print from the drawer  
+- **Empire Seals** — share codes to import another operator’s empire as a rival  
 
 ## Play locally
 

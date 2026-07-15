@@ -3,144 +3,109 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ShadowMarket — Constraint-Native Micro-Empires</title>
-  <meta name="description" content="A hidden parallel economy of personal micro-empires built from everyday constraints." />
+  <title>ShadowMarket</title>
+  <meta name="description" content="Visual micro-empires grown from everyday constraints." />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <div id="app">
-    <header class="topbar">
-      <div class="brand">
-        <span class="mark">◈</span>
-        <div>
-          <strong>ShadowMarket</strong>
-          <span class="sub">parallel economy · not crypto</span>
+  <div id="app" class="game-shell">
+    <!-- FULLSCREEN MAP -->
+    <div id="stage" class="stage">
+      <canvas id="empire-map" aria-label="Empire map"></canvas>
+
+      <!-- Top chrome -->
+      <div class="hud-top">
+        <div class="minimap-wrap">
+          <canvas id="minimap" width="140" height="100"></canvas>
+        </div>
+        <div class="title-banner">
+          <span class="title-icon">◎</span>
+          <span id="empire-title">ShadowMarket</span>
+          <button type="button" id="btn-settings" class="icon-btn" title="Reset / settings">⚙</button>
+        </div>
+        <div class="hud-top-right">
+          <button type="button" class="icon-btn" id="btn-blueprints-hud" title="Blueprints" disabled>◈</button>
+          <button type="button" class="icon-btn" id="btn-seal-copy" title="Copy Empire Seal" disabled>⇪</button>
         </div>
       </div>
-      <nav class="nav" aria-label="Primary">
-        <button type="button" data-nav="intake" class="active">Intake</button>
-        <button type="button" data-nav="dossier" disabled>Dossier</button>
-        <button type="button" data-nav="sim" disabled>Simulation</button>
-        <button type="button" data-nav="blueprints" disabled>Blueprints</button>
-        <button type="button" data-nav="rivals" disabled>Rivals</button>
-      </nav>
-    </header>
 
-    <main>
-      <!-- INTAKE -->
-      <section data-view="intake" class="view">
-        <div class="panel hero">
-          <p class="kicker">Hidden floor · personal micro-empires</p>
-          <h1>Build an empire from a constraint you already have.</h1>
-          <p class="lede">
-            Not trading cards. Not tokens. You name a real-life limit —
-            garage space, sleep windows, shipping delays — and ShadowMarket
-            generates a fictional system that <em>thrives because of it</em>.
-            Run it in accelerated time. Export blueprints. Deal with rival empires.
-          </p>
+      <!-- Side inspect -->
+      <aside id="inspect" class="inspect" hidden>
+        <button type="button" class="inspect-close" id="inspect-close">×</button>
+        <div id="inspect-body"></div>
+        <div id="inspect-actions" class="inspect-actions"></div>
+      </aside>
 
-          <label class="field">
-            <span>Your constraint</span>
-            <textarea id="constraint-input" rows="3" placeholder="e.g. limited garage space — only one bay free, wall-to-wall bins"></textarea>
-          </label>
+      <!-- Bottom resource bars -->
+      <div class="hud-resources" id="hud-resources"></div>
 
-          <div class="preset-row">
-            <span class="label">Presets</span>
-            <div id="preset-list" class="chips"></div>
-          </div>
+      <!-- Bottom toolbar -->
+      <div class="hud-toolbar">
+        <button type="button" id="btn-sim-start" class="tool primary" title="Run simulation">▶ Run</button>
+        <button type="button" id="btn-sim-pause" class="tool" title="Pause">⏸</button>
+        <div class="speed tool-group" role="group" aria-label="Speed">
+          <button type="button" data-speed="1">1×</button>
+          <button type="button" data-speed="10" class="active">10×</button>
+          <button type="button" data-speed="60">60×</button>
+        </div>
+        <button type="button" id="btn-new-empire" class="tool" title="New empire">＋</button>
+        <button type="button" id="btn-export-md" class="tool" title="Export MD" disabled>MD</button>
+        <span id="sim-meta" class="sim-chip">Idle</span>
+      </div>
 
+      <!-- Floating event toast strip -->
+      <div id="event-ticker" class="event-ticker" hidden></div>
+    </div>
+
+    <!-- INTAKE OVERLAY -->
+    <div id="intake-overlay" class="overlay">
+      <div class="overlay-card">
+        <p class="kicker">ShadowMarket</p>
+        <h1>Your constraint.<br />Your empire floor.</h1>
+        <p class="lede">Name a real limit. We build a visual micro-empire that runs on it — not a wall of text.</p>
+        <label class="field">
+          <span>Constraint</span>
+          <textarea id="constraint-input" rows="2" placeholder="limited garage space…"></textarea>
+        </label>
+        <div id="preset-list" class="chips"></div>
+        <button type="button" id="btn-found" class="primary wide">Enter the floor</button>
+      </div>
+    </div>
+
+    <!-- BLUEPRINTS DRAWER -->
+    <div id="bp-drawer" class="drawer" hidden>
+      <div class="drawer-panel">
+        <header>
+          <h2>Blueprints</h2>
           <div class="actions">
-            <button type="button" id="btn-found" class="primary">Found micro-empire</button>
-            <span class="hint">⌘/Ctrl + Enter to found</span>
+            <button type="button" id="btn-export-json">JSON</button>
+            <button type="button" id="btn-print">Print</button>
+            <button type="button" id="bp-close">Close</button>
           </div>
-        </div>
-      </section>
+        </header>
+        <div id="blueprint-list" class="blueprint-grid"></div>
+      </div>
+    </div>
 
-      <!-- DOSSIER -->
-      <section data-view="dossier" class="view" hidden>
-        <div class="panel" id="dossier"></div>
-        <div class="panel slim actions-bar">
-          <button type="button" class="primary" data-nav="sim">Open simulation floor</button>
-          <button type="button" data-nav="blueprints">View blueprints</button>
-          <button type="button" id="btn-seal-copy">Copy Empire Seal</button>
-        </div>
-      </section>
-
-      <!-- SIMULATION -->
-      <section data-view="sim" class="view" hidden>
-        <div class="sim-layout">
-          <div class="panel">
-            <div class="panel-head">
-              <h2>Simulation floor</h2>
-              <div id="sim-meta" class="sim-meta muted"></div>
-            </div>
-            <div class="sim-controls">
-              <button type="button" id="btn-sim-start" class="primary">Run</button>
-              <button type="button" id="btn-sim-pause">Pause</button>
-              <div class="speed" role="group" aria-label="Simulation speed">
-                <button type="button" data-speed="1">1×</button>
-                <button type="button" data-speed="10" class="active">10×</button>
-                <button type="button" data-speed="60">60×</button>
-              </div>
-            </div>
-            <div id="sim-meters" class="meters"></div>
-            <div class="spark-wrap">
-              <span class="label">Capital trail</span>
-              <div id="sparkline" class="sparkline"></div>
-            </div>
-          </div>
-          <div class="panel ledger-panel">
-            <h2>Ledger</h2>
-            <ul id="ledger" class="ledger"></ul>
-          </div>
-        </div>
-      </section>
-
-      <!-- BLUEPRINTS -->
-      <section data-view="blueprints" class="view print-section" hidden>
-        <div class="panel">
-          <div class="panel-head">
-            <h2>Exportable blueprints</h2>
-            <div class="actions">
-              <button type="button" id="btn-export-md">Export Markdown</button>
-              <button type="button" id="btn-export-json">Export JSON</button>
-              <button type="button" id="btn-print">Print / PDF</button>
-            </div>
-          </div>
-          <div id="blueprint-list" class="blueprint-grid"></div>
-        </div>
-      </section>
-
-      <!-- RIVALS -->
-      <section data-view="rivals" class="view" hidden>
-        <div class="panel">
-          <div class="panel-head">
-            <h2>Rival market</h2>
-            <p class="muted small">Anonymous systems on the floor. Ally, sabotage, or merge — locally simulated. Import a seal from another operator to meet their empire.</p>
-          </div>
-          <div class="seal-box">
-            <label class="field">
-              <span>Import Empire Seal</span>
-              <input id="seal-input" type="text" placeholder="Paste seal from another device…" autocomplete="off" />
-            </label>
-            <button type="button" id="btn-seal-import">Import rival</button>
-          </div>
-          <div id="rival-list" class="rival-grid"></div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <span>ShadowMarket v1 · local-only state</span>
-      <button type="button" id="btn-reset" class="linkish">Reset device state</button>
-    </footer>
+    <!-- SETTINGS / SEAL -->
+    <div id="settings-modal" class="overlay" hidden>
+      <div class="overlay-card slim">
+        <h2>Ops desk</h2>
+        <label class="field">
+          <span>Import rival Empire Seal</span>
+          <input id="seal-input" type="text" placeholder="Paste seal…" autocomplete="off" />
+        </label>
+        <button type="button" id="btn-seal-import" class="primary wide">Import rival</button>
+        <button type="button" id="btn-reset" class="danger wide">Wipe device state</button>
+        <button type="button" id="settings-close" class="wide">Close</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast" hidden role="status"></div>
-
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

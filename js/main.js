@@ -11,38 +11,33 @@ import {
   importRivalSeal,
 } from "./rivals.js";
 import { exportMarkdown, exportJSON, printBlueprints } from "./export.js";
+import { EmpireMap } from "./map.js";
 import {
   $,
-  showView,
   toast,
+  showIntake,
+  showDrawer,
+  showSettings,
   renderPresets,
-  renderDossier,
-  renderSim,
+  renderHud,
+  renderInspect,
   renderBlueprints,
-  renderRivals,
-  setNavEnabled,
+  flashEvent,
 } from "./ui.js";
 
 let state = loadState();
 let simTimer = null;
+let map = null;
 
 function persist() {
   saveState(state);
 }
 
-function refreshAll() {
-  const has = !!state.player;
-  setNavEnabled(has);
-  renderDossier(state.player);
-  renderSim(state);
+function refreshVisual() {
+  map?.setState(state);
+  map?.drawMinimap($("#minimap"));
+  renderHud(state);
   renderBlueprints(state.player);
-  renderRivals(state, {
-    onAlly: (id) => act(() => allyWith(state, id)),
-    onSabotage: (id) => act(() => sabotage(state, id)),
-    onMerge: (id) => act(() => mergeWith(state, id)),
-  });
-  updateSpeedUI();
-  $("#btn-seal-copy") && ($("#btn-seal-copy").disabled = !has);
 }
 
 function act(fn) {
@@ -52,14 +47,15 @@ function act(fn) {
     return;
   }
   toast(res.outcome || "Done");
+  flashEvent(res.outcome);
   persist();
-  refreshAll();
+  refreshVisual();
 }
 
 function foundEmpire(text) {
   const trimmed = (text || "").trim();
   if (trimmed.length < 4) {
-    toast("Describe a real constraint (a few words at least).");
+    toast("Name a real constraint (a few words).");
     return;
   }
   stopSim();
@@ -70,11 +66,11 @@ function foundEmpire(text) {
   state.modifiers = { revenueMult: 1, burnMult: 1, allyIds: [], sabotageUntil: {} };
   state.rivals = [];
   initRivals(state);
-  pushLedger(state, `Founded ${state.player.displayName} from constraint.`, 0);
+  pushLedger(state, `Founded ${state.player.displayName}`, 0);
   persist();
-  refreshAll();
-  showView("dossier");
-  toast(`Empire online: ${state.player.handle}`);
+  showIntake(false);
+  refreshVisual();
+  toast("Empire floor online");
 }
 
 function stopSim() {
@@ -82,188 +78,182 @@ function stopSim() {
     clearInterval(simTimer);
     simTimer = null;
   }
-  if (state.player && state.player.status === "running") {
-    state.player.status = "paused";
-  }
+  if (state.player?.status === "running") state.player.status = "paused";
+  if (map) map.running = false;
 }
 
 function startSim() {
-  if (!state.player) {
-    toast("Found an empire first.");
-    return;
-  }
+  if (!state.player) return toast("Found an empire first");
   if (state.player.status === "collapsed" || state.player.status === "ascended") {
-    toast("This empire has ended. Found a new one from the intake floor.");
-    return;
+    return toast("Empire ended — start a new one");
   }
   stopSim();
   state.player.status = "running";
+  if (map) map.running = true;
   const speed = state.settings.speed || 10;
-  // base: 1 logical tick per interval; speed scales interval
   const interval = Math.max(50, Math.round(1000 / speed));
   simTimer = setInterval(() => {
     const res = tickOnce(state);
     persist();
-    renderSim(state);
-    renderDossier(state.player);
+    refreshVisual();
+    if (res.events?.length) flashEvent(res.events[res.events.length - 1]);
     if (res.ended) {
       stopSim();
-      refreshAll();
-      if (res.reason === "ascended") toast("Ascended — your micro-empire is the quiet standard.");
-      else if (res.reason === "collapsed") toast("Collapsed — the constraint claimed another operator.");
+      refreshVisual();
+      if (res.reason === "ascended") toast("Ascended — niche standard achieved");
+      else toast("Collapsed — constraint won this round");
     }
   }, interval);
   persist();
-  refreshAll();
-  toast(`Simulation running at ${speed}×`);
+  refreshVisual();
 }
 
 function updateSpeedUI() {
   const speed = state.settings.speed || 10;
-  $allSpeed().forEach((btn) => {
+  document.querySelectorAll("[data-speed]").forEach((btn) => {
     btn.classList.toggle("active", Number(btn.dataset.speed) === speed);
   });
 }
 
-function $allSpeed() {
-  return [...document.querySelectorAll("[data-speed]")];
-}
-
 function boot() {
+  const canvas = $("#empire-map");
+  map = new EmpireMap(canvas);
+  map.onSelect = (node) => {
+    renderInspect(node, {
+      onBlueprints: () => showDrawer(true),
+      onAlly: (id) => act(() => allyWith(state, id)),
+      onSabotage: (id) => act(() => sabotage(state, id)),
+      onMerge: (id) => act(() => mergeWith(state, id)),
+    });
+  };
+
   renderPresets(PRESETS, (p) => {
     $("#constraint-input").value = p.text;
   });
 
-  // Navigation
-  document.querySelectorAll("[data-nav]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      showView(btn.dataset.nav);
-    });
-  });
-
-  $("#btn-found")?.addEventListener("click", () => {
-    foundEmpire($("#constraint-input")?.value);
-  });
-
+  $("#btn-found")?.addEventListener("click", () => foundEmpire($("#constraint-input")?.value));
   $("#constraint-input")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      foundEmpire(e.target.value);
-    }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) foundEmpire(e.target.value);
   });
 
   $("#btn-sim-start")?.addEventListener("click", startSim);
   $("#btn-sim-pause")?.addEventListener("click", () => {
     stopSim();
     persist();
-    refreshAll();
-    toast("Simulation paused");
+    refreshVisual();
+    toast("Paused");
   });
 
-  $allSpeed().forEach((btn) => {
+  document.querySelectorAll("[data-speed]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.settings.speed = Number(btn.dataset.speed) || 10;
       persist();
+      updateSpeedUI();
       if (simTimer) startSim();
-      else updateSpeedUI();
     });
   });
 
+  $("#btn-new-empire")?.addEventListener("click", () => showIntake(true));
+  $("#btn-blueprints-hud")?.addEventListener("click", () => {
+    if (!state.player) return;
+    renderBlueprints(state.player);
+    showDrawer(true);
+  });
+  $("#bp-close")?.addEventListener("click", () => showDrawer(false));
+  $("#inspect-close")?.addEventListener("click", () => {
+    $("#inspect").hidden = true;
+    if (map) map.selectedId = null;
+  });
+
   $("#btn-export-md")?.addEventListener("click", () => {
-    if (!state.player) return toast("No empire to export");
+    if (!state.player) return;
     exportMarkdown(state.player);
     toast("Markdown downloaded");
   });
   $("#btn-export-json")?.addEventListener("click", () => {
-    if (!state.player) return toast("No empire to export");
-    exportJSON(state.player, { rivals: state.rivals?.length, tick: state.player.tick });
+    if (!state.player) return;
+    exportJSON(state.player);
     toast("JSON downloaded");
   });
-  $("#btn-print")?.addEventListener("click", () => {
-    if (!state.player) return toast("No empire to print");
-    printBlueprints();
-  });
+  $("#btn-print")?.addEventListener("click", () => printBlueprints());
 
   $("#btn-seal-copy")?.addEventListener("click", async () => {
     if (!state.player) return;
     const seal = encodeSeal(state.player);
     try {
       await navigator.clipboard.writeText(seal);
-      toast("Empire Seal copied — send it to another operator");
+      toast("Empire Seal copied");
     } catch {
-      prompt("Copy your Empire Seal:", seal);
+      prompt("Empire Seal:", seal);
     }
   });
 
+  $("#btn-settings")?.addEventListener("click", () => showSettings(true));
+  $("#settings-close")?.addEventListener("click", () => showSettings(false));
   $("#btn-seal-import")?.addEventListener("click", () => {
     const seal = $("#seal-input")?.value;
-    if (!seal?.trim()) return toast("Paste an Empire Seal first");
+    if (!seal?.trim()) return toast("Paste a seal first");
+    if (!state.player) return toast("Found your empire first");
     const res = importRivalSeal(state, seal.trim());
     if (!res.ok) return toast(res.error);
     $("#seal-input").value = "";
+    showSettings(false);
     persist();
-    refreshAll();
-    showView("rivals");
-    toast(`Imported ${res.empire.handle}`);
+    refreshVisual();
+    toast(`Rival ${res.empire.handle} on the floor`);
   });
-
   $("#btn-reset")?.addEventListener("click", () => {
-    if (!confirm("Wipe local ShadowMarket state on this device?")) return;
+    if (!confirm("Wipe all local ShadowMarket data?")) return;
     stopSim();
     state = resetState();
-    initRivals(state);
-    persist();
-    refreshAll();
-    showView("intake");
-    toast("State wiped");
+    showSettings(false);
+    showIntake(true);
+    refreshVisual();
+    toast("Wiped");
   });
 
-  // Ensure rivals exist even without player (for empty market feel)
-  if (!state.rivals?.length) initRivals(state);
-
-  if (state.player) {
-    refreshAll();
-    showView("dossier");
-  } else {
-    setNavEnabled(false);
-    showView("intake");
-    renderRivals(state, {
-      onAlly: () => toast("Found an empire first"),
-      onSabotage: () => toast("Found an empire first"),
-      onMerge: () => toast("Found an empire first"),
-    });
-  }
-
-  // Keyboard: 1/2/3 speed when on sim
   window.addEventListener("keydown", (e) => {
     if (e.target.matches("input, textarea")) return;
     if (e.key === "1") {
       state.settings.speed = 1;
+      updateSpeedUI();
       if (simTimer) startSim();
-      else updateSpeedUI();
     }
     if (e.key === "2") {
       state.settings.speed = 10;
+      updateSpeedUI();
       if (simTimer) startSim();
-      else updateSpeedUI();
     }
     if (e.key === "3") {
       state.settings.speed = 60;
+      updateSpeedUI();
       if (simTimer) startSim();
-      else updateSpeedUI();
     }
-    if (e.key === " ") {
-      const simVisible = !$("[data-view='sim']")?.hidden;
-      if (simVisible) {
-        e.preventDefault();
-        if (simTimer) {
-          stopSim();
-          persist();
-          refreshAll();
-        } else startSim();
-      }
+    if (e.key === " " && state.player) {
+      e.preventDefault();
+      if (simTimer) {
+        stopSim();
+        persist();
+        refreshVisual();
+      } else startSim();
+    }
+    if (e.key === "Escape") {
+      showDrawer(false);
+      showSettings(false);
+      $("#inspect").hidden = true;
     }
   });
+
+  if (!state.rivals?.length && state.player) initRivals(state);
+
+  if (state.player) {
+    showIntake(false);
+    refreshVisual();
+  } else {
+    showIntake(true);
+    refreshVisual();
+  }
+  updateSpeedUI();
 }
 
 boot();
