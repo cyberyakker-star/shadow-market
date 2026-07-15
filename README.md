@@ -1,49 +1,37 @@
 # ShadowMarket
 
-A **hidden, parallel economy** inside your browser — not crypto, not trading cards — **personal micro-empires** built from everyday constraints.
+A **constraint-native micro-empire game**: your real-life limit becomes a warehouse floor.  
+**MAKE** stock → **SHIP** hauls for cash → **UPGRADE** nodes → manage **energy** and **heat**.
 
-You name a real limit (“limited garage space”, “newborn sleep windows”, “supplement shipping delays”). ShadowMarket generates a fictional system that **thrives because of that constraint**, shown as a **live industrial empire map** (nodes, glowing lanes, minimap, resource bars) — not a wall of text.
+## How to play (30 seconds)
 
-- **Visual empire floor** — HQ, blueprint outposts, rival sites on a connected map  
-- **Playable simulation** — accelerated time, packets on paths, SPACE / TIME / HAULS meters  
-- **Click any node** — inspect HQ, blueprints, or rival actions (ally / sabotage / merge)  
-- **Exportable blueprints** — Markdown / JSON / print from the drawer  
-- **Empire Seals** — share codes to import another operator’s empire as a rival  
+1. Name a constraint (or pick a preset) → **Build empire floor**
+2. **MAKE** — spend 1 energy, fill STOCK (limited by SPACE)
+3. **SHIP** — convert stock into ₡ cash + 1 haul (raises HEAT)
+4. **UPGRADE** — spend cash to level HQ / blueprint nodes (better MAKE)
+5. **COOL** — dump heat · **REST** — refill energy (rivals act)
+6. **Win:** 10 hauls **or** ₡800 · **Lose:** heat hits 100
 
-## Play locally
+**Keys:** `1` MAKE · `2` SHIP · `3` UPGRADE · `4` COOL · `5`/`R` REST
 
-ES modules need a static server (not `file://`):
+Click map nodes: HQ, blueprints (upgrade), rivals (ally / hit).
+
+## Run locally
 
 ```bash
 cd shadow-market
 python3 -m http.server 8080
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
+Open http://localhost:8080
 
-## How to use
+## Why it exists
 
-1. **Intake** — type a constraint or pick a preset → **Found micro-empire**  
-2. **Dossier** — read the pitch, stats, archetype  
-3. **Simulation** — Run / Pause; speed **1× / 10× / 60×** (keys `1` `2` `3`, Space to toggle)  
-4. **Blueprints** — export Markdown, JSON, or print  
-5. **Rivals** — ally / sabotage / merge; paste an **Empire Seal** to import someone else’s system  
-
-State is stored in `localStorage` (`shadowmarket:v1`) on this device only.
-
-## Currency fiction
-
-**₡** is a shadow-market unit of account for the sim — not real money.
+Not crypto. Not cards. A short, readable loop where **scarcity is the ruleset** — space, energy, and heat — flavored by whatever constraint you typed.
 
 ## Stack
 
-Pure HTML, CSS, and ES-module JavaScript. No build step, no API keys, no backend.
-
-Empire generation is **procedural** (constraint tagging + seeded templates). Optional LLM remix can be added later server-side without changing the data model.
-
-## Repo
-
-https://github.com/cyberyakker-star/shadow-market
+Static HTML / CSS / Canvas JS. No build step. State in `localStorage`.
 
 ## License
 
