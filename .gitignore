@@ -3,7 +3,5 @@ node_modules/
 .vscode/
 .idea/
 *.log
-dist/
-.cache/
 .env
 .env.*
