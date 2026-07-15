@@ -115,6 +115,100 @@ body {
   justify-self: end;
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.cash-chip {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(74, 200, 122, 0.12);
+  border: 1px solid rgba(74, 200, 122, 0.4);
+  color: var(--ok);
+}
+
+.goal-banner {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 440px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  z-index: 6;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.goal-banner strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.goal-banner .muted {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.goal-progress {
+  height: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.goal-progress i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #2a70c0, var(--cyan));
+  transition: width 0.25s ease;
+}
+
+.help-strip {
+  position: absolute;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 10px;
+  max-width: 96vw;
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  background: rgba(8, 10, 14, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  z-index: 4;
+  transition: opacity 0.3s;
+}
+
+.help-strip.dim {
+  opacity: 0.35;
+}
+
+.help-strip b {
+  color: var(--text);
+}
+
+.help-strip .sep {
+  opacity: 0.4;
+}
+
+.tool.primary-alt {
+  background: linear-gradient(135deg, #4ac87a, #2a8050);
+  border-color: transparent;
+  color: #fff;
 }
 
 .icon-btn {
@@ -247,7 +341,7 @@ body {
 .hud-resources {
   position: absolute;
   right: 14px;
-  bottom: 78px;
+  bottom: 120px;
   display: grid;
   gap: 8px;
   width: min(220px, 46vw);
