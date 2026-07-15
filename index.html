@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ShadowMarket</title>
-  <meta name="description" content="Visual micro-empires grown from everyday constraints." />
+  <meta name="description" content="MAKE stock. SHIP hauls. Don't overheat. Constraint-native empire game." />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,11 +12,9 @@
 </head>
 <body>
   <div id="app" class="game-shell">
-    <!-- FULLSCREEN MAP -->
     <div id="stage" class="stage">
       <canvas id="empire-map" aria-label="Empire map"></canvas>
 
-      <!-- Top chrome -->
       <div class="hud-top">
         <div class="minimap-wrap">
           <canvas id="minimap" width="140" height="100"></canvas>
@@ -24,65 +22,79 @@
         <div class="title-banner">
           <span class="title-icon">◎</span>
           <span id="empire-title">ShadowMarket</span>
-          <button type="button" id="btn-settings" class="icon-btn" title="Reset / settings">⚙</button>
+          <button type="button" id="btn-settings" class="icon-btn" title="Settings">⚙</button>
         </div>
         <div class="hud-top-right">
+          <div id="cash-chip" class="cash-chip">₡0</div>
           <button type="button" class="icon-btn" id="btn-blueprints-hud" title="Blueprints" disabled>◈</button>
-          <button type="button" class="icon-btn" id="btn-seal-copy" title="Copy Empire Seal" disabled>⇪</button>
         </div>
       </div>
 
-      <!-- Side inspect -->
+      <!-- Clear goal -->
+      <div id="goal-banner" class="goal-banner" hidden>
+        <div class="goal-progress"><i id="goal-fill"></i></div>
+        <strong id="goal-title">Goal</strong>
+        <span id="goal-detail" class="muted"></span>
+      </div>
+
       <aside id="inspect" class="inspect" hidden>
         <button type="button" class="inspect-close" id="inspect-close">×</button>
         <div id="inspect-body"></div>
         <div id="inspect-actions" class="inspect-actions"></div>
       </aside>
 
-      <!-- Bottom resource bars -->
       <div class="hud-resources" id="hud-resources"></div>
 
-      <!-- Bottom toolbar -->
-      <div class="hud-toolbar">
-        <button type="button" id="btn-sim-start" class="tool primary" title="Run simulation">▶ Run</button>
-        <button type="button" id="btn-sim-pause" class="tool" title="Pause">⏸</button>
-        <div class="speed tool-group" role="group" aria-label="Speed">
-          <button type="button" data-speed="1">1×</button>
-          <button type="button" data-speed="10" class="active">10×</button>
-          <button type="button" data-speed="60">60×</button>
-        </div>
-        <button type="button" id="btn-new-empire" class="tool" title="New empire">＋</button>
-        <button type="button" id="btn-export-md" class="tool" title="Export MD" disabled>MD</button>
-        <span id="sim-meta" class="sim-chip">Idle</span>
+      <!-- How to play strip -->
+      <div class="help-strip" id="help-strip">
+        <span><b>1.MAKE</b> stock</span>
+        <span>→</span>
+        <span><b>2.SHIP</b> for ₡</span>
+        <span>→</span>
+        <span><b>3.UPGRADE</b></span>
+        <span>→</span>
+        <span><b>REST</b> when out of energy</span>
+        <span class="sep">·</span>
+        <span>Win: <b>10 hauls</b> or <b>₡800</b> · Lose: <b>heat 100</b></span>
       </div>
 
-      <!-- Floating event toast strip -->
+      <div class="hud-toolbar">
+        <button type="button" id="btn-make" class="tool primary" disabled title="Spend 1 energy, fill stock">MAKE</button>
+        <button type="button" id="btn-ship" class="tool primary-alt" disabled title="Ship stock for cash + 1 haul">SHIP</button>
+        <button type="button" id="btn-upgrade" class="tool" disabled title="Upgrade selected node or HQ">UPGRADE</button>
+        <button type="button" id="btn-cool" class="tool" disabled title="Dump heat">COOL</button>
+        <button type="button" id="btn-rest" class="tool" disabled title="Refill energy; rivals act">REST</button>
+        <button type="button" id="btn-new-empire" class="tool" title="New game">＋</button>
+        <span id="sim-meta" class="sim-chip">—</span>
+      </div>
+
       <div id="event-ticker" class="event-ticker" hidden></div>
     </div>
 
-    <!-- INTAKE OVERLAY -->
     <div id="intake-overlay" class="overlay">
       <div class="overlay-card">
         <p class="kicker">ShadowMarket</p>
-        <h1>Your constraint.<br />Your empire floor.</h1>
-        <p class="lede">Name a real limit. We build a visual micro-empire that runs on it — not a wall of text.</p>
+        <h1>Run a micro-empire<br />inside a real constraint.</h1>
+        <p class="lede">
+          <b>MAKE</b> stock → <b>SHIP</b> hauls for cash → <b>UPGRADE</b> your floor.
+          Manage <b>energy</b> and <b>heat</b>. Beat <b>10 hauls</b> or <b>₡800</b> before heat hits 100.
+        </p>
         <label class="field">
-          <span>Constraint</span>
+          <span>Your real constraint (flavors the map)</span>
           <textarea id="constraint-input" rows="2" placeholder="limited garage space…"></textarea>
         </label>
         <div id="preset-list" class="chips"></div>
-        <button type="button" id="btn-found" class="primary wide">Enter the floor</button>
+        <button type="button" id="btn-found" class="primary wide">Build empire floor</button>
       </div>
     </div>
 
-    <!-- BLUEPRINTS DRAWER -->
     <div id="bp-drawer" class="drawer" hidden>
       <div class="drawer-panel">
         <header>
           <h2>Blueprints</h2>
           <div class="actions">
+            <button type="button" id="btn-export-md">MD</button>
             <button type="button" id="btn-export-json">JSON</button>
-            <button type="button" id="btn-print">Print</button>
             <button type="button" id="bp-close">Close</button>
           </div>
         </header>
@@ -90,17 +102,25 @@
       </div>
     </div>
 
-    <!-- SETTINGS / SEAL -->
     <div id="settings-modal" class="overlay" hidden>
       <div class="overlay-card slim">
         <h2>Ops desk</h2>
         <label class="field">
-          <span>Import rival Empire Seal</span>
+          <span>Import rival seal</span>
           <input id="seal-input" type="text" placeholder="Paste seal…" autocomplete="off" />
         </label>
         <button type="button" id="btn-seal-import" class="primary wide">Import rival</button>
-        <button type="button" id="btn-reset" class="danger wide">Wipe device state</button>
+        <button type="button" id="btn-seal-copy" class="wide">Copy my Empire Seal</button>
+        <button type="button" id="btn-reset" class="danger wide">Wipe save</button>
         <button type="button" id="settings-close" class="wide">Close</button>
+      </div>
+    </div>
+
+    <div id="end-overlay" class="overlay" hidden>
+      <div class="overlay-card slim" id="end-card">
+        <h2 id="end-title">Done</h2>
+        <p id="end-body" class="lede"></p>
+        <button type="button" id="btn-end-new" class="primary wide">New empire</button>
       </div>
     </div>
   </div>
