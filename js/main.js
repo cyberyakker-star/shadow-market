@@ -1,23 +1,28 @@
 import { PRESETS } from "./data/presets.js";
-import { loadState, saveState, resetState, pushLedger } from "./state.js";
+import { loadState, saveState, resetState } from "./state.js";
 import { generateEmpire } from "./generate.js";
-import { tickOnce } from "./simulate.js";
-import {
-  initRivals,
-  allyWith,
-  sabotage,
-  mergeWith,
-  encodeSeal,
-  importRivalSeal,
-} from "./rivals.js";
-import { exportMarkdown, exportJSON, printBlueprints } from "./export.js";
+import { initRivals, encodeSeal, importRivalSeal } from "./rivals.js";
+import { exportMarkdown, exportJSON } from "./export.js";
 import { EmpireMap } from "./map.js";
+import {
+  initGame,
+  ensureGame,
+  actionMake,
+  actionShip,
+  actionUpgrade,
+  actionCool,
+  actionRest,
+  actionHitRival,
+  actionAllyRival,
+  upgradeCost,
+} from "./game.js";
 import {
   $,
   toast,
   showIntake,
   showDrawer,
   showSettings,
+  showEnd,
   renderPresets,
   renderHud,
   renderInspect,
@@ -25,107 +30,102 @@ import {
   flashEvent,
 } from "./ui.js";
 
+const STORAGE_BUMP = "shadowmarket:v2-game";
+
 let state = loadState();
-let simTimer = null;
+// Force new game schema if missing
+if (state.player && !state.player.game) {
+  state.player = null;
+  saveState(state);
+}
+
 let map = null;
+let selectedId = "hq";
 
 function persist() {
   saveState(state);
 }
 
-function refreshVisual() {
+function refresh() {
+  if (state.player) ensureGame(state.player);
   map?.setState(state);
   map?.drawMinimap($("#minimap"));
-  renderHud(state);
+  renderHud(state, selectedId);
   renderBlueprints(state.player);
 }
 
-function act(fn) {
+function doAction(fn) {
+  if (!state.player) return toast("Build an empire first");
   const res = fn();
   if (!res.ok) {
-    toast(res.error || "Action failed");
+    toast(res.error || "Can't do that");
     return;
   }
-  toast(res.outcome || "Done");
-  flashEvent(res.outcome);
+  if (res.fx) map?.fx(res.fx.kind, res.fx.amount || 0);
+  flashEvent(res.msg);
+  toast(res.msg);
   persist();
-  refreshVisual();
+  refresh();
+  // re-open inspect if selection still valid
+  const node = map?.nodes?.find((n) => n.id === selectedId);
+  if (node) openInspect(node);
+
+  if (res.ended) {
+    if (res.reason === "ascended") {
+      showEnd(true, "Empire secured", `You hit the win target. ${res.msg || ""}`);
+    } else {
+      showEnd(true, "Shut down", res.msg || "Heat or collapse ended the run.");
+    }
+  }
+}
+
+function openInspect(node) {
+  selectedId = node.id;
+  renderInspect(node, {
+    getLevel: (id) => state.player?.game?.levels?.[id] || 1,
+    upgradeCost: (id) => upgradeCost(state.player, id),
+    onMake: () => doAction(() => actionMake(state)),
+    onShip: () => doAction(() => actionShip(state)),
+    onUpgrade: (id) => doAction(() => actionUpgrade(state, id || "hq")),
+    onAlly: (id) => doAction(() => actionAllyRival(state, id)),
+    onHit: (id) => doAction(() => actionHitRival(state, id)),
+  });
+  renderHud(state, selectedId);
 }
 
 function foundEmpire(text) {
   const trimmed = (text || "").trim();
-  if (trimmed.length < 4) {
-    toast("Name a real constraint (a few words).");
-    return;
-  }
-  stopSim();
-  state.player = generateEmpire(trimmed);
+  if (trimmed.length < 4) return toast("Type a real constraint (a few words).");
+
+  state.player = initGame(generateEmpire(trimmed));
   state.ledger = [];
-  state.capitalHistory = [state.player.resources.capital];
+  state.capitalHistory = [];
   state.actions = [];
   state.modifiers = { revenueMult: 1, burnMult: 1, allyIds: [], sabotageUntil: {} };
   state.rivals = [];
   initRivals(state);
-  pushLedger(state, `Founded ${state.player.displayName}`, 0);
+  // fewer rivals for clarity
+  state.rivals = state.rivals.slice(0, 5);
+
+  selectedId = "hq";
   persist();
   showIntake(false);
-  refreshVisual();
-  toast("Empire floor online");
-}
-
-function stopSim() {
-  if (simTimer) {
-    clearInterval(simTimer);
-    simTimer = null;
-  }
-  if (state.player?.status === "running") state.player.status = "paused";
-  if (map) map.running = false;
-}
-
-function startSim() {
-  if (!state.player) return toast("Found an empire first");
-  if (state.player.status === "collapsed" || state.player.status === "ascended") {
-    return toast("Empire ended — start a new one");
-  }
-  stopSim();
-  state.player.status = "running";
-  if (map) map.running = true;
-  const speed = state.settings.speed || 10;
-  const interval = Math.max(50, Math.round(1000 / speed));
-  simTimer = setInterval(() => {
-    const res = tickOnce(state);
-    persist();
-    refreshVisual();
-    if (res.events?.length) flashEvent(res.events[res.events.length - 1]);
-    if (res.ended) {
-      stopSim();
-      refreshVisual();
-      if (res.reason === "ascended") toast("Ascended — niche standard achieved");
-      else toast("Collapsed — constraint won this round");
-    }
-  }, interval);
-  persist();
-  refreshVisual();
-}
-
-function updateSpeedUI() {
-  const speed = state.settings.speed || 10;
-  document.querySelectorAll("[data-speed]").forEach((btn) => {
-    btn.classList.toggle("active", Number(btn.dataset.speed) === speed);
-  });
+  showEnd(false);
+  refresh();
+  toast("Floor online — MAKE stock, then SHIP");
+  flashEvent("Goal: complete 3 hauls. MAKE → SHIP → REST when energy is empty.");
 }
 
 function boot() {
-  const canvas = $("#empire-map");
-  map = new EmpireMap(canvas);
-  map.onSelect = (node) => {
-    renderInspect(node, {
-      onBlueprints: () => showDrawer(true),
-      onAlly: (id) => act(() => allyWith(state, id)),
-      onSabotage: (id) => act(() => sabotage(state, id)),
-      onMerge: (id) => act(() => mergeWith(state, id)),
-    });
-  };
+  // one-time clear of confusing v1 autosim saves
+  try {
+    if (!localStorage.getItem(STORAGE_BUMP)) {
+      localStorage.setItem(STORAGE_BUMP, "1");
+    }
+  } catch {}
+
+  map = new EmpireMap($("#empire-map"));
+  map.onSelect = (node) => openInspect(node);
 
   renderPresets(PRESETS, (p) => {
     $("#constraint-input").value = p.text;
@@ -136,26 +136,26 @@ function boot() {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) foundEmpire(e.target.value);
   });
 
-  $("#btn-sim-start")?.addEventListener("click", startSim);
-  $("#btn-sim-pause")?.addEventListener("click", () => {
-    stopSim();
-    persist();
-    refreshVisual();
-    toast("Paused");
+  $("#btn-make")?.addEventListener("click", () => doAction(() => actionMake(state)));
+  $("#btn-ship")?.addEventListener("click", () => doAction(() => actionShip(state)));
+  $("#btn-upgrade")?.addEventListener("click", () => {
+    const id =
+      selectedId && state.player?.game?.levels?.[selectedId] != null ? selectedId : "hq";
+    doAction(() => actionUpgrade(state, id));
+  });
+  $("#btn-cool")?.addEventListener("click", () => doAction(() => actionCool(state)));
+  $("#btn-rest")?.addEventListener("click", () => doAction(() => actionRest(state)));
+
+  $("#btn-new-empire")?.addEventListener("click", () => {
+    showEnd(false);
+    showIntake(true);
+  });
+  $("#btn-end-new")?.addEventListener("click", () => {
+    showEnd(false);
+    showIntake(true);
   });
 
-  document.querySelectorAll("[data-speed]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.settings.speed = Number(btn.dataset.speed) || 10;
-      persist();
-      updateSpeedUI();
-      if (simTimer) startSim();
-    });
-  });
-
-  $("#btn-new-empire")?.addEventListener("click", () => showIntake(true));
   $("#btn-blueprints-hud")?.addEventListener("click", () => {
-    if (!state.player) return;
     renderBlueprints(state.player);
     showDrawer(true);
   });
@@ -166,77 +166,49 @@ function boot() {
   });
 
   $("#btn-export-md")?.addEventListener("click", () => {
-    if (!state.player) return;
-    exportMarkdown(state.player);
-    toast("Markdown downloaded");
+    if (state.player) exportMarkdown(state.player);
   });
   $("#btn-export-json")?.addEventListener("click", () => {
-    if (!state.player) return;
-    exportJSON(state.player);
-    toast("JSON downloaded");
-  });
-  $("#btn-print")?.addEventListener("click", () => printBlueprints());
-
-  $("#btn-seal-copy")?.addEventListener("click", async () => {
-    if (!state.player) return;
-    const seal = encodeSeal(state.player);
-    try {
-      await navigator.clipboard.writeText(seal);
-      toast("Empire Seal copied");
-    } catch {
-      prompt("Empire Seal:", seal);
-    }
+    if (state.player) exportJSON(state.player);
   });
 
   $("#btn-settings")?.addEventListener("click", () => showSettings(true));
   $("#settings-close")?.addEventListener("click", () => showSettings(false));
+  $("#btn-seal-copy")?.addEventListener("click", async () => {
+    if (!state.player) return toast("No empire");
+    const seal = encodeSeal(state.player);
+    try {
+      await navigator.clipboard.writeText(seal);
+      toast("Seal copied");
+    } catch {
+      prompt("Seal:", seal);
+    }
+  });
   $("#btn-seal-import")?.addEventListener("click", () => {
-    const seal = $("#seal-input")?.value;
-    if (!seal?.trim()) return toast("Paste a seal first");
-    if (!state.player) return toast("Found your empire first");
-    const res = importRivalSeal(state, seal.trim());
+    if (!state.player) return toast("Build your empire first");
+    const res = importRivalSeal(state, $("#seal-input")?.value || "");
     if (!res.ok) return toast(res.error);
     $("#seal-input").value = "";
     showSettings(false);
     persist();
-    refreshVisual();
-    toast(`Rival ${res.empire.handle} on the floor`);
+    refresh();
+    toast("Rival imported");
   });
   $("#btn-reset")?.addEventListener("click", () => {
-    if (!confirm("Wipe all local ShadowMarket data?")) return;
-    stopSim();
+    if (!confirm("Wipe save?")) return;
     state = resetState();
     showSettings(false);
     showIntake(true);
-    refreshVisual();
-    toast("Wiped");
+    refresh();
   });
 
   window.addEventListener("keydown", (e) => {
     if (e.target.matches("input, textarea")) return;
-    if (e.key === "1") {
-      state.settings.speed = 1;
-      updateSpeedUI();
-      if (simTimer) startSim();
-    }
-    if (e.key === "2") {
-      state.settings.speed = 10;
-      updateSpeedUI();
-      if (simTimer) startSim();
-    }
-    if (e.key === "3") {
-      state.settings.speed = 60;
-      updateSpeedUI();
-      if (simTimer) startSim();
-    }
-    if (e.key === " " && state.player) {
-      e.preventDefault();
-      if (simTimer) {
-        stopSim();
-        persist();
-        refreshVisual();
-      } else startSim();
-    }
+    if (e.key === "1") doAction(() => actionMake(state));
+    if (e.key === "2") doAction(() => actionShip(state));
+    if (e.key === "3") doAction(() => actionUpgrade(state, selectedId === "hq" ? "hq" : selectedId));
+    if (e.key === "4") doAction(() => actionCool(state));
+    if (e.key === "5" || e.key === "r") doAction(() => actionRest(state));
     if (e.key === "Escape") {
       showDrawer(false);
       showSettings(false);
@@ -244,16 +216,15 @@ function boot() {
     }
   });
 
-  if (!state.rivals?.length && state.player) initRivals(state);
-
   if (state.player) {
+    ensureGame(state.player);
+    if (!state.rivals?.length) initRivals(state);
     showIntake(false);
-    refreshVisual();
+    refresh();
   } else {
     showIntake(true);
-    refreshVisual();
+    refresh();
   }
-  updateSpeedUI();
 }
 
 boot();
