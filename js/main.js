@@ -1,4 +1,3 @@
-// Night Ops entry
 import { PRESETS } from "./districts.js";
 import {
   createGame,
