@@ -1,15 +1,10 @@
-import { formatSimTime } from "./simulate.js";
-import { visualResources } from "./map.js";
+import { getGoal, visualBars, upgradeCost } from "./game.js";
 
 export function $(sel, root = document) {
   return root.querySelector(sel);
 }
 
-export function $all(sel, root = document) {
-  return [...root.querySelectorAll(sel)];
-}
-
-export function toast(msg, ms = 2600) {
+export function toast(msg, ms = 2400) {
   const el = $("#toast");
   if (!el) return;
   el.textContent = msg;
@@ -35,6 +30,14 @@ export function showSettings(show) {
   if (el) el.hidden = !show;
 }
 
+export function showEnd(show, title = "", body = "") {
+  const el = $("#end-overlay");
+  if (!el) return;
+  el.hidden = !show;
+  if (title) $("#end-title").textContent = title;
+  if (body) $("#end-body").textContent = body;
+}
+
 export function renderPresets(presets, onPick) {
   const host = $("#preset-list");
   if (!host) return;
@@ -49,31 +52,45 @@ export function renderPresets(presets, onPick) {
   };
 }
 
-export function renderHud(state) {
+export function flashEvent(text) {
+  const el = $("#event-ticker");
+  if (!el || !text) return;
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(flashEvent._t);
+  flashEvent._t = setTimeout(() => {
+    el.hidden = true;
+  }, 2800);
+}
+
+export function renderHud(state, selectedId = "hq") {
   const p = state.player;
+  const g = p?.game;
   const title = $("#empire-title");
   if (title) {
     title.textContent = p
-      ? (p.constraint?.raw || p.displayName).replace(/\s+/g, " ").slice(0, 42)
+      ? (p.constraint?.raw || p.displayName).replace(/\s+/g, " ").slice(0, 40)
       : "ShadowMarket";
   }
 
+  const cash = $("#cash-chip");
+  if (cash) cash.textContent = p?.game ? `₡${Math.round(p.game.cash)}` : "₡0";
+
   const meta = $("#sim-meta");
   if (meta) {
-    if (!p) meta.textContent = "No empire";
+    if (!g) meta.textContent = "—";
     else {
-      meta.textContent = `${p.status} · ${formatSimTime(p.tick || 0)} · ₡${Math.round(p.resources.capital)}`;
-      meta.className = `sim-chip status-${p.status}`;
+      meta.textContent = `Shift ${g.shift} · Hauls ${g.hauls}/10 · Threat ${g.threat || 0}`;
     }
   }
 
   const resHost = $("#hud-resources");
   if (resHost) {
-    const bars = visualResources(p);
+    const bars = visualBars(p);
     resHost.innerHTML = bars
       .map((b) => {
-        const pct = Math.round((b.value / b.max) * 100);
-        const cls = pct < 25 ? "low" : pct > 70 ? "high" : "";
+        const pct = Math.round((b.value / Math.max(1, b.max)) * 100);
+        const cls = b.key === "heat" ? (pct > 70 ? "low" : "") : pct < 25 ? "low" : pct > 70 ? "high" : "";
         return `
           <div class="res-bar ${cls}" title="${escapeHtml(b.hint || "")}">
             <span class="res-label">${escapeHtml(b.label)}</span>
@@ -84,24 +101,42 @@ export function renderHud(state) {
       .join("");
   }
 
-  const has = !!p;
-  ["#btn-blueprints-hud", "#btn-seal-copy", "#btn-export-md", "#btn-sim-start", "#btn-sim-pause"].forEach(
-    (sel) => {
-      const el = $(sel);
-      if (el) el.disabled = !has;
+  // Goal
+  const goalEl = $("#goal-banner");
+  if (goalEl) {
+    if (!p) {
+      goalEl.hidden = true;
+    } else {
+      goalEl.hidden = false;
+      const goal = getGoal(p);
+      $("#goal-title").textContent = goal.title;
+      $("#goal-detail").textContent = goal.detail;
+      const fill = $("#goal-fill");
+      if (fill) fill.style.width = `${Math.round(clamp(goal.progress, 0, 1) * 100)}%`;
     }
-  );
+  }
+
+  const has = !!p && p.status !== "collapsed" && p.status !== "ascended";
+  ["#btn-make", "#btn-ship", "#btn-upgrade", "#btn-cool", "#btn-rest", "#btn-blueprints-hud"].forEach((sel) => {
+    const el = $(sel);
+    if (el) el.disabled = !has;
+  });
+
+  // Upgrade button shows cost
+  const up = $("#btn-upgrade");
+  if (up && g) {
+    const tid = selectedId && selectedId !== "hq" && g.levels?.[selectedId] != null ? selectedId : "hq";
+    const cost = upgradeCost(p, tid);
+    up.textContent = `UPGRADE ₡${cost}`;
+  } else if (up) up.textContent = "UPGRADE";
+
+  // Dim help after first haul
+  const help = $("#help-strip");
+  if (help && g) help.classList.toggle("dim", g.hauls >= 2);
 }
 
-export function flashEvent(text) {
-  const el = $("#event-ticker");
-  if (!el || !text) return;
-  el.textContent = text;
-  el.hidden = false;
-  clearTimeout(flashEvent._t);
-  flashEvent._t = setTimeout(() => {
-    el.hidden = true;
-  }, 3200);
+function clamp(v, a, b) {
+  return Math.max(a, Math.min(b, v));
 }
 
 export function renderInspect(node, handlers = {}) {
@@ -118,46 +153,51 @@ export function renderInspect(node, handlers = {}) {
 
   if (m.type === "hq") {
     const e = m.empire;
+    const g = e.game;
     body.innerHTML = `
-      <p class="kicker">Headquarters</p>
+      <p class="kicker">Your HQ · Lv${g?.hqLevel || 1}</p>
       <h3>${escapeHtml(e.displayName)}</h3>
-      <p class="handle">${escapeHtml(e.handle)}</p>
-      <p class="one-liner">${escapeHtml(e.pitch.split(".")[0])}.</p>
+      <p class="one-liner">MAKE here fills stock. UPGRADE raises output. Win at 10 hauls or ₡800.</p>
       <div class="mini-stats">
-        <span>₡${Math.round(e.resources.capital)}</span>
-        <span>Rep ${Math.round(e.resources.reputation)}</span>
-        <span>Heat ${Math.round(e.metrics.heat)}</span>
+        <span>Stock ${g?.stock ?? 0}/${g?.stockMax ?? 0}</span>
+        <span>Energy ${g?.energy ?? 0}</span>
+        <span>Heat ${Math.round(g?.heat ?? 0)}</span>
       </div>`;
-    actions.innerHTML = `<button type="button" data-go="bp">Blueprints</button>`;
+    actions.innerHTML = `
+      <button type="button" data-act="make">MAKE</button>
+      <button type="button" data-act="ship">SHIP</button>
+      <button type="button" data-act="upgrade">UPGRADE HQ</button>`;
   } else if (m.type === "blueprint") {
     const bp = m.bp;
+    const lv = handlers.getLevel?.(bp.id) || 1;
     body.innerHTML = `
-      <p class="kicker">${escapeHtml(bp.kind)}</p>
+      <p class="kicker">${escapeHtml(bp.kind)} · Lv${lv}</p>
       <h3>${escapeHtml(bp.title)}</h3>
       <p class="one-liner">${escapeHtml(bp.summary)}</p>
-      <ol class="tight">${(bp.steps || []).slice(0, 3).map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>`;
-    actions.innerHTML = `<button type="button" data-go="bp">All blueprints</button>`;
+      <p class="muted small">Upgrading this node boosts MAKE output.</p>`;
+    actions.innerHTML = `<button type="button" data-act="upgrade">UPGRADE ₡${handlers.upgradeCost?.(bp.id) ?? "?"}</button>`;
   } else if (m.type === "rival") {
     const r = m.rival;
     body.innerHTML = `
       <p class="kicker">${escapeHtml(r.relation || "rival")}</p>
       <h3>${escapeHtml(r.displayName)}</h3>
-      <p class="handle">${escapeHtml(r.handle)}</p>
-      <p class="one-liner">${escapeHtml((r.constraint?.raw || "").slice(0, 80))}</p>`;
+      <p class="one-liner">Constraint: ${escapeHtml((r.constraint?.raw || "").slice(0, 70))}</p>
+      <p class="muted small">Allies pay you on REST. Unchecked rivals steal stock and raise threat.</p>`;
     const dis = r.relation === "merged" ? "disabled" : "";
     actions.innerHTML = `
-      <button type="button" data-act="ally" ${dis || r.relation === "ally" ? "disabled" : ""}>Ally</button>
-      <button type="button" data-act="sabotage" ${dis}>Sabotage</button>
-      <button type="button" data-act="merge" ${dis}>Merge</button>`;
+      <button type="button" data-act="ally" ${dis || r.relation === "ally" ? "disabled" : ""}>ALLY ₡25</button>
+      <button type="button" data-act="hit" ${dis}>HIT</button>`;
   }
 
   actions.onclick = (e) => {
     const btn = e.target.closest("button");
-    if (!btn) return;
-    if (btn.dataset.go === "bp" && handlers.onBlueprints) handlers.onBlueprints();
-    if (btn.dataset.act === "ally" && handlers.onAlly) handlers.onAlly(m.rival.id);
-    if (btn.dataset.act === "sabotage" && handlers.onSabotage) handlers.onSabotage(m.rival.id);
-    if (btn.dataset.act === "merge" && handlers.onMerge) handlers.onMerge(m.rival.id);
+    if (!btn || btn.disabled) return;
+    const act = btn.dataset.act;
+    if (act === "make") handlers.onMake?.();
+    if (act === "ship") handlers.onShip?.();
+    if (act === "upgrade") handlers.onUpgrade?.(m.type === "blueprint" ? m.bp.id : "hq");
+    if (act === "ally") handlers.onAlly?.(m.rival.id);
+    if (act === "hit") handlers.onHit?.(m.rival.id);
   };
 }
 
@@ -165,17 +205,17 @@ export function renderBlueprints(empire) {
   const host = $("#blueprint-list");
   if (!host) return;
   if (!empire?.blueprints?.length) {
-    host.innerHTML = `<p class="muted">No blueprints yet.</p>`;
+    host.innerHTML = `<p class="muted">No blueprints.</p>`;
     return;
   }
+  const levels = empire.game?.levels || {};
   host.innerHTML = empire.blueprints
     .map(
       (bp) => `
     <article class="bp-card" data-kind="${bp.kind}">
-      <span class="bp-kind">${escapeHtml(bp.kind)}</span>
+      <span class="bp-kind">${escapeHtml(bp.kind)} · Lv${levels[bp.id] || 1}</span>
       <h3>${escapeHtml(bp.title)}</h3>
       <p>${escapeHtml(bp.summary)}</p>
-      <ol>${(bp.steps || []).map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
     </article>`
     )
     .join("");
@@ -183,15 +223,8 @@ export function renderBlueprints(empire) {
 
 export function escapeHtml(str) {
   return String(str ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
 }
-
-// stubs kept for any leftover imports
-export function showView() {}
-export function setNavEnabled() {}
-export function renderDossier() {}
-export function renderSim() {}
-export function renderRivals() {}
