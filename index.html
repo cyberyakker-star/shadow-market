@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShadowMarket — Constraint-Native Micro-Empires</title>
+  <meta name="description" content="A hidden parallel economy of personal micro-empires built from everyday constraints." />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">◈</span>
+        <div>
+          <strong>ShadowMarket</strong>
+          <span class="sub">parallel economy · not crypto</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <button type="button" data-nav="intake" class="active">Intake</button>
+        <button type="button" data-nav="dossier" disabled>Dossier</button>
+        <button type="button" data-nav="sim" disabled>Simulation</button>
+        <button type="button" data-nav="blueprints" disabled>Blueprints</button>
+        <button type="button" data-nav="rivals" disabled>Rivals</button>
+      </nav>
+    </header>
+
+    <main>
+      <!-- INTAKE -->
+      <section data-view="intake" class="view">
+        <div class="panel hero">
+          <p class="kicker">Hidden floor · personal micro-empires</p>
+          <h1>Build an empire from a constraint you already have.</h1>
+          <p class="lede">
+            Not trading cards. Not tokens. You name a real-life limit —
+            garage space, sleep windows, shipping delays — and ShadowMarket
+            generates a fictional system that <em>thrives because of it</em>.
+            Run it in accelerated time. Export blueprints. Deal with rival empires.
+          </p>
+
+          <label class="field">
+            <span>Your constraint</span>
+            <textarea id="constraint-input" rows="3" placeholder="e.g. limited garage space — only one bay free, wall-to-wall bins"></textarea>
+          </label>
+
+          <div class="preset-row">
+            <span class="label">Presets</span>
+            <div id="preset-list" class="chips"></div>
+          </div>
+
+          <div class="actions">
+            <button type="button" id="btn-found" class="primary">Found micro-empire</button>
+            <span class="hint">⌘/Ctrl + Enter to found</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- DOSSIER -->
+      <section data-view="dossier" class="view" hidden>
+        <div class="panel" id="dossier"></div>
+        <div class="panel slim actions-bar">
+          <button type="button" class="primary" data-nav="sim">Open simulation floor</button>
+          <button type="button" data-nav="blueprints">View blueprints</button>
+          <button type="button" id="btn-seal-copy">Copy Empire Seal</button>
+        </div>
+      </section>
+
+      <!-- SIMULATION -->
+      <section data-view="sim" class="view" hidden>
+        <div class="sim-layout">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Simulation floor</h2>
+              <div id="sim-meta" class="sim-meta muted"></div>
+            </div>
+            <div class="sim-controls">
+              <button type="button" id="btn-sim-start" class="primary">Run</button>
+              <button type="button" id="btn-sim-pause">Pause</button>
+              <div class="speed" role="group" aria-label="Simulation speed">
+                <button type="button" data-speed="1">1×</button>
+                <button type="button" data-speed="10" class="active">10×</button>
+                <button type="button" data-speed="60">60×</button>
+              </div>
+            </div>
+            <div id="sim-meters" class="meters"></div>
+            <div class="spark-wrap">
+              <span class="label">Capital trail</span>
+              <div id="sparkline" class="sparkline"></div>
+            </div>
+          </div>
+          <div class="panel ledger-panel">
+            <h2>Ledger</h2>
+            <ul id="ledger" class="ledger"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- BLUEPRINTS -->
+      <section data-view="blueprints" class="view print-section" hidden>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Exportable blueprints</h2>
+            <div class="actions">
+              <button type="button" id="btn-export-md">Export Markdown</button>
+              <button type="button" id="btn-export-json">Export JSON</button>
+              <button type="button" id="btn-print">Print / PDF</button>
+            </div>
+          </div>
+          <div id="blueprint-list" class="blueprint-grid"></div>
+        </div>
+      </section>
+
+      <!-- RIVALS -->
+      <section data-view="rivals" class="view" hidden>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Rival market</h2>
+            <p class="muted small">Anonymous systems on the floor. Ally, sabotage, or merge — locally simulated. Import a seal from another operator to meet their empire.</p>
+          </div>
+          <div class="seal-box">
+            <label class="field">
+              <span>Import Empire Seal</span>
+              <input id="seal-input" type="text" placeholder="Paste seal from another device…" autocomplete="off" />
+            </label>
+            <button type="button" id="btn-seal-import">Import rival</button>
+          </div>
+          <div id="rival-list" class="rival-grid"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>ShadowMarket v1 · local-only state</span>
+      <button type="button" id="btn-reset" class="linkish">Reset device state</button>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" hidden role="status"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
